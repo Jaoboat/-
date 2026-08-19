@@ -17,7 +17,7 @@
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-md-8 text-center mb-4">
-        <h2 class="fw-bold">สถานีวัดระดับน้ำทะเล</h2>
+        <h2 class="fw-bold">สถานีวัดระดับน้ำทะเล / ความสูงคลื่น</h2>
         
         <div class="btn-group shadow-sm mt-3">
           <input type="radio" class="btn-check" name="btnradio" id="btn-andaman" checked onchange="changeLocation('andaman')">
@@ -63,15 +63,17 @@
       const loc = locations[currentLocation];
       document.getElementById('location-name').innerText = loc.name;
       
-      const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${loc.lat}&longitude=${loc.lon}&hourly=sea_level&timezone=Asia%2FBangkok&forecast_days=1`;
+      // เปลี่ยนจาก sea_level เป็น wave_height ที่ API รองรับ
+      const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${loc.lat}&longitude=${loc.lon}&hourly=wave_height&timezone=Asia%2FBangkok&forecast_days=1`;
 
       try {
         const response = await fetch(url);
+        if (!response.ok) throw new Error("HTTP Status: " + response.status);
         const data = await response.json();
         
         const now = new Date();
         const times = data.hourly.time;
-        const seaLevels = data.hourly.sea_level;
+        const waveHeights = data.hourly.wave_height;
         
         let currentIndex = 0;
         let minDiff = Infinity;
@@ -82,19 +84,24 @@
           if (diff < minDiff) { minDiff = diff; currentIndex = index; }
         });
 
-        const currentLevel = seaLevels[currentIndex];
-        const prevLevel = currentIndex > 0 ? seaLevels[currentIndex - 1] : currentLevel;
+        const currentLevel = waveHeights[currentIndex];
+        const prevLevel = currentIndex > 0 ? waveHeights[currentIndex - 1] : currentLevel;
 
         document.getElementById('sea-level').innerText = currentLevel.toFixed(2) + " m";
         
         const statusEl = document.getElementById('tide-status');
         if (currentLevel > prevLevel) {
-          statusEl.innerHTML = "📈 น้ำกำลังขึ้น"; statusEl.className = "badge bg-danger p-2 fs-6";
+          statusEl.innerHTML = "📈 คลื่นกำลังสูงขึ้น"; statusEl.className = "badge bg-danger p-2 fs-6";
+        } else if (currentLevel < prevLevel) {
+          statusEl.innerHTML = "📉 คลื่นกำลังลดลง"; statusEl.className = "badge bg-success p-2 fs-6";
         } else {
-          statusEl.innerHTML = "📉 น้ำกำลังลง"; statusEl.className = "badge bg-success p-2 fs-6";
+          statusEl.innerHTML = "➖ ระดับทรงตัว"; statusEl.className = "badge bg-info p-2 fs-6";
         }
       } catch (e) {
+        console.error("Fetch error:", e);
         document.getElementById('sea-level').innerText = "Error";
+        document.getElementById('tide-status').innerText = "ดึงข้อมูลไม่สำเร็จ";
+        document.getElementById('tide-status').className = "badge bg-danger p-2 fs-6";
       }
     }
 
